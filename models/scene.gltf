@@ -1,0 +1,313 @@
+{
+  "accessors": [
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 65533,
+      "max": [
+        60.905998229980469,
+        48.998001098632812,
+        92.418006896972656
+      ],
+      "min": [
+        -60.908000946044922,
+        -49,
+        0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 786396,
+      "componentType": 5126,
+      "count": 65533,
+      "max": [
+        1,
+        0.99998891353607178,
+        1
+      ],
+      "min": [
+        -1,
+        -1,
+        -1
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 1572792,
+      "componentType": 5126,
+      "count": 65533,
+      "max": [
+        1,
+        1,
+        1
+      ],
+      "min": [
+        1,
+        1,
+        1
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 0,
+      "componentType": 5125,
+      "count": 66381,
+      "max": [
+        65532
+      ],
+      "min": [
+        0
+      ],
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 2359188,
+      "componentType": 5126,
+      "count": 64125,
+      "max": [
+        58.537998199462891,
+        48.998001098632812,
+        92.418006896972656
+      ],
+      "min": [
+        -60.908000946044922,
+        -49,
+        0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 3128688,
+      "componentType": 5126,
+      "count": 64125,
+      "max": [
+        0.99999940395355225,
+        0.99999058246612549,
+        1
+      ],
+      "min": [
+        -1,
+        -0.99997025728225708,
+        -0.99998319149017334
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 3898188,
+      "componentType": 5126,
+      "count": 64125,
+      "max": [
+        1,
+        1,
+        1
+      ],
+      "min": [
+        1,
+        1,
+        1
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 265524,
+      "componentType": 5125,
+      "count": 64437,
+      "max": [
+        64124
+      ],
+      "min": [
+        0
+      ],
+      "type": "SCALAR"
+    }
+  ],
+  "asset": {
+    "extras": {
+      "author": "thefailtheory (https://sketchfab.com/thefailtheory)",
+      "license": "CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+      "source": "https://sketchfab.com/models/9a19d654dc5141099537acfcce3058e9",
+      "title": "Tachikoma"
+    },
+    "generator": "Sketchfab-3.18.6",
+    "version": "2.0"
+  },
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 523272,
+      "byteOffset": 0,
+      "name": "floatBufferViews",
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 4667688,
+      "byteOffset": 523272,
+      "byteStride": 12,
+      "name": "floatBufferViews",
+      "target": 34962
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 5190960,
+      "uri": "scene.bin"
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "emissiveFactor": [
+        0,
+        0,
+        0
+      ],
+      "name": "Material.001",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.054479803899999998,
+          0.027536863500000001,
+          0.80000007149999997,
+          1
+        ],
+        "metallicFactor": 0,
+        "roughnessFactor": 0.59999999999999998
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Tachikoma_0",
+      "primitives": [
+        {
+          "attributes": {
+            "COLOR_0": 2,
+            "NORMAL": 1,
+            "POSITION": 0
+          },
+          "indices": 3,
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "Tachikoma_0",
+      "primitives": [
+        {
+          "attributes": {
+            "COLOR_0": 6,
+            "NORMAL": 5,
+            "POSITION": 4
+          },
+          "indices": 7,
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "children": [
+        1
+      ],
+      "name": "RootNode (gltf orientation matrix)",
+      "rotation": [
+        -0.70710678118654746,
+        -0,
+        -0,
+        0.70710678118654757
+      ]
+    },
+    {
+      "children": [
+        2
+      ],
+      "name": "RootNode (model correction matrix)"
+    },
+    {
+      "children": [
+        3,
+        5
+      ],
+      "name": "Root"
+    },
+    {
+      "children": [
+        4
+      ],
+      "matrix": [
+        -0.62472000000000016,
+        0.77871000000000001,
+        -0.057760000000000006,
+        0,
+        -0.64199000000000017,
+        -0.47011000000000003,
+        0.60569000000000017,
+        0,
+        0.44450000000000006,
+        0.41547000000000006,
+        0.79361000000000004,
+        0,
+        31.751860000000004,
+        -45.979599999999998,
+        30.489929999999998,
+        1
+      ],
+      "name": "Lamp"
+    },
+    {
+      "name": "Lamp"
+    },
+    {
+      "children": [
+        6,
+        7
+      ],
+      "matrix": [
+        0.24923000000000003,
+        0.0087100000000000025,
+        -0.017580000000000005,
+        0,
+        -0.009360000000000002,
+        0.24966000000000002,
+        -0.0089800000000000019,
+        0,
+        0.017250000000000005,
+        0.0096100000000000022,
+        0.24922000000000002,
+        0,
+        4.4875499999999997,
+        -1.4671199999999998,
+        2.3340699999999996,
+        1
+      ],
+      "name": "Tachikoma"
+    },
+    {
+      "mesh": 0,
+      "name": "Tachikoma_0"
+    },
+    {
+      "mesh": 1,
+      "name": "Tachikoma_0"
+    }
+  ],
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "OSG_Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ]
+}
+

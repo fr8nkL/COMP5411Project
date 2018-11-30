@@ -1,0 +1,630 @@
+<html>
+	<head>
+		<title>3D Maze Rendering</title>
+		<style>
+			body { margin: 0; }
+			canvas { width: 100%; height: 100% }
+		</style>
+	</head>
+	<body>
+        <div id="container"></div>
+        <!-- <div id="log">this is the log div</div> -->
+
+        <script src="js/three.js"></script>
+        <script src="js/WebGL.js"></script>
+        <script src="js/libs/stats.min.js"></script>
+
+        <script src="js/loaders/GLTFLoader.js"></script>
+        <script src="js/KeyboardState.js"></script>
+        <script src="js/THREEx.KeyboardState.js"></script>
+        <script src="js/objects/Reflector.js"></script>
+        <script src="js/objects/Lensflare.js"></script>
+
+        <script src="js/controls/TrackballControls.js"></script>
+        <script src="js/controls/OrbitControls.js"></script>
+		<script src="js/modifiers/TessellateModifier.js"></script>
+        
+        <!-- Halo effect & glow effect -->
+        <script id="vertexShader" type="x-shader/x-vertex">
+        uniform vec3 viewVector;
+        uniform float c;
+        uniform float p;
+        varying float intensity;
+        void main() 
+        {
+            vec3 vNormal = normalize( normalMatrix * normal );
+            vec3 vNormel = normalize( normalMatrix * viewVector );
+            intensity = pow( c - dot(vNormal, vNormel), p );
+            
+            gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+        }
+        </script>
+        <script id="fragmentShader" type="x-shader/x-vertex"> 
+        uniform vec3 customColor;
+        varying float intensity;
+        void main() 
+        {
+            vec3 colorEffect = customColor * intensity;
+            gl_FragColor = vec4( colorEffect, 1.0 );
+        }
+        </script>
+        <!-- end of shader code -->
+
+        <script>    
+        if ( WEBGL.isWebGLAvailable() === false ) {
+            document.body.appendChild( WEBGL.getWebGLErrorMessage() );
+        }
+
+        // object variables in the world
+        var keyboard = new THREEx.KeyboardState();
+        var renderer, scene, camera, container, stats, controls;
+        var uniforms;
+        var textureLoader, maxAnisotropy;
+        var hero, model;// the player object
+        var walls = [];
+        
+        // interactable variables
+        var isHeroVisible = false;
+        var visionHelpFlag = 0;
+
+        // constant variables
+        var WIDTH = window.innerWidth;
+        var HEIGHT = window.innerHeight;
+        var GroundSize = 5000;
+        var MoonPos0 = new THREE.Vector3( -5000, 3000, -10000 );
+        var MoonPos1 = new THREE.Vector3(  5000, 3000, -10000 );
+        var StarPos0 = new THREE.Vector3( -5000, 2500,  10000 );
+        var StarPos1 = new THREE.Vector3(  5000, 3000,  10000 );
+        var WallHeight = 3;
+        var WallWidth = 2;
+        var HeroSize = new THREE.Vector3( 1, 2, 1  );
+        var HeroResolution = new THREE.Vector3( 10, 10, 10 ); 
+        var HeroPos = new THREE.Vector3( 0, 1, 30);
+        var RelativeCameraOffset = new THREE.Vector3( 0, /*0.1, 5*/ /*0.2, 8*/ 0.1, 3 );
+        var PaceStep = 0.1;
+        var RotationStep = Math.PI / 2 / 60;
+        var ResolutionNear = 1024;
+        var ResolutionFar = 512;
+
+        init();
+        animate();
+
+        function log(mesg){
+            var temp = " " + mesg;
+            document.getElementById("log").innerHTML += temp;
+        }
+
+        function printV(originPoint){
+            var mesg = '(' + String(originPoint.x) + ',' + String(originPoint.y) + ',' + String(originPoint.y) + ')';
+            log(mesg);
+        }
+        
+        function init(){
+            // init the scene and camera
+            scene = new THREE.Scene();
+			camera = new THREE.PerspectiveCamera( 45, window.innerWidth/window.innerHeight, 0.1, 20000 );
+            //camera.position.set( 0, 10, 10 );
+            //camera.lookAt( new THREE.Vector3( 0, 10, -10 ) );
+            //camera.lookAt(scene.position);
+
+            // renderer
+            renderer = new THREE.WebGLRenderer();
+            renderer.setPixelRatio( window.devicePixelRatio );
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			document.body.appendChild( renderer.domElement );
+			renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            // container
+            container = document.getElementById( 'container' );
+            container.appendChild( renderer.domElement );
+            // stats
+            stats = new Stats();
+            /*stats.domElement.style.position = 'absolute';
+            stats.domElement.style.bottom = '0px';
+        	stats.domElement.style.zIndex = 100;*/
+            container.appendChild( stats.dom );
+
+            // window resize
+            window.addEventListener( 'resize', onWindowResize, false );
+            // keyboard events
+            document.addEventListener("keydown", onKeyDown, false);
+
+            // get textureLoader
+            textureLoader = new THREE.TextureLoader();
+            maxAnisotropy = renderer.capabilities.getMaxAnisotropy();
+
+            // get texture for lensflare
+            var textureFlareCore = textureLoader.load( 'textures/lensflare2.png' );
+            var textureFlareRflct = textureLoader.load( 'textures/lensflare3.png' );
+
+            
+            
+            // add entrance and exit info
+            addMessage( "Entrance", 0, 5, 0 );
+            addMessage( "Exit", 0, 5, -50 );
+            
+            // add wall            
+            addWalls();
+            
+            // add the hero, i.e. the player object
+            addHero( HeroSize, HeroResolution, HeroPos );
+            // add bots
+            addBot();
+            
+            // add floor
+            addFloor();
+
+            // add lights
+
+            // street lights
+            // entrance
+            addLight(0.08, 0.8, 0.5,   -4, 6,   0, textureFlareCore, textureFlareRflct);
+            addLight(0.08, 0.8, 0.5,    4, 6,   0, textureFlareCore, textureFlareRflct);
+            // exit
+            addLight(0.08, 0.8, 0.5,   -4, 6, -50, textureFlareCore, textureFlareRflct);
+            addLight(0.08, 0.8, 0.5,    4, 6, -50, textureFlareCore, textureFlareRflct);
+            // right boundary
+            addLight(0.08, 0.8, 0.8,   55, 8, -10, textureFlareCore, textureFlareRflct);
+            addLight(0.08, 0.8, 0.8,   55, 8, -25, textureFlareCore, textureFlareRflct);
+            addLight(0.08, 0.8, 0.8,   55, 8, -40, textureFlareCore, textureFlareRflct);
+            // inner street lights
+            addLight(0.08, 0.8, 0.8,   30, 6, -20, textureFlareCore, textureFlareRflct);
+            
+            // add moon
+            addMoon( MoonPos0 );
+            addMoon( MoonPos1 )
+            
+            // add star
+            addStar( StarPos0 );
+            addStar( StarPos1 );
+            
+            // add ambient light
+            var ambient = new THREE.AmbientLight( 0x404040, 0.7 );
+            scene.add( ambient );
+        } // end of init()
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize( window.innerWidth, window.innerHeight );
+        }
+
+        function addHero( size, resolution, pos ){
+           var geometry = new THREE.BoxGeometry( size.x, size.y, size.z, resolution.x, resolution.y, resolution.z );
+            var material = new THREE.MeshPhongMaterial( { map: textureLoader.load( "textures/yui2.png" ) } );
+            hero = new THREE.Mesh( geometry, material );
+            hero.position.set( pos.x, pos.y, pos.z );
+            hero.castShadow = true;
+            hero.receiveShadow = true;
+            hero.visible = isHeroVisible;
+            scene.add(hero);
+        }
+
+        function addBot() {
+            var loader = new THREE.GLTFLoader();
+            loader.load( 'models/RobotExpressive.glb', function( gltf ) {
+                var model = gltf.scene;
+                model.position.x = 3;
+                model.position.z = -2;
+                model.scale.multiplyScalar(0.7);
+                scene.add( model );
+                var obj = model.clone();
+                obj.position.x = -3;
+                scene.add( obj );
+            }, undefined, function( e ) {
+                log(e);
+			} );
+            loader.load( 'models/scene.gltf', function( gltf ) {
+                model = gltf.scene;
+                model.rotation.y -= Math.PI / 2;
+                model.scale.multiplyScalar(0.2);
+                model.position.z = -60;
+                model.castShadow = true;
+                model.receiveShadow = true;
+                model.visible = true;
+                scene.add( model );
+            }, undefined, function( e ) {
+                log(e);
+			} );
+        }
+
+        function addFloor(){
+            // add floor
+            var texture_stone_road = textureLoader.load( "textures/marbleFloor.png" );
+			var material_road = new THREE.MeshPhongMaterial( { map: texture_stone_road } );
+            texture_stone_road.anisotropy = maxAnisotropy;
+			texture_stone_road.wrapS = texture_stone_road.wrapT = THREE.RepeatWrapping;
+            texture_stone_road.repeat.set(4096,4096);
+            var groundGeometry = new THREE.PlaneBufferGeometry( GroundSize, GroundSize )
+            this.plane = new THREE.Mesh( groundGeometry, material_road );
+            plane.rotation.x = - Math.PI / 2;
+            plane.receiveShadow = true;
+            plane.material.transparent = true;
+            scene.add( plane );
+            // add reflective effect to the floor
+            var groundMirror = new THREE.Reflector( groundGeometry, {
+                clipBias: 0.003,
+                textureWidth: WIDTH * window.devicePixelRatio,
+                textureHeight: HEIGHT * window.devicePixelRatio,
+                color: 0x777777,
+                recursion: 1
+            } );
+            groundMirror.position.y = -0.05;
+            groundMirror.rotateX( - Math.PI / 2 );
+            scene.add( groundMirror );
+        }
+        
+        function addMoon( pos ){
+            // add moon
+            var moonGeom = new THREE.SphereGeometry(400, 32, 32);
+            var moonTexture = textureLoader.load( 'textures/moon2.png' );
+            var moonMaterial = new THREE.MeshBasicMaterial( { map: moonTexture } );
+            var moon = new THREE.Mesh(moonGeom, moonMaterial);
+            moon.position.set( pos.x, pos.y, pos.z );
+            scene.add(moon);
+            
+            var lightColor = new THREE.Color(0xca2f2f); //ca2f2f de4545 c32828
+            // add halo effect for the moon
+            var haloMaterial = new THREE.ShaderMaterial( 
+            {
+                uniforms: 
+                { 
+                    c:   { type: "f", value: 0.5 },
+                    p:   { type: "f", value: 6.0 },
+                    customColor: { type: "c", value: lightColor }, 
+                    viewVector: { type: "v3", value: camera.position }
+                },
+                vertexShader:   document.getElementById( 'vertexShader'   ).textContent,
+                fragmentShader: document.getElementById( 'fragmentShader' ).textContent,
+                side: THREE.BackSide,
+                blending: THREE.AdditiveBlending,
+                transparent: true
+            }   );
+            this.moonHalo = new THREE.Mesh( moonGeom.clone(), haloMaterial.clone() );
+            moonHalo.position.set( pos.x, pos.y, pos.z );
+            moonHalo.scale.multiplyScalar(1.3);
+            scene.add( moonHalo );
+
+            // TODO: add the emissive lights from the moon
+            var light = new THREE.DirectionalLight( lightColor, 0.4 );
+            light.position.set( pos.x, pos.y, pos.z );
+            light.castShadow = true;
+			light.shadow.mapSize.width = 512;
+			light.shadow.mapSize.height = 512;
+			light.shadow.camera.near = 0.5;
+            light.shadow.camera.far = 500;
+            //var targetObject = new THREE.Object3D();
+            //targetObject.position.set( pos.x, -1, pos.z );
+            //light.target = targetObject
+            //scene.add( targetObject );
+            scene.add( light );
+            //scene.add( light.target );
+        }
+
+        function addStar( pos ){
+            var starGeom = new THREE.SphereGeometry(400, 32, 32);
+            var starTexture = textureLoader.load( 'textures/moon.jpg' );
+            var starMaterial = new THREE.MeshBasicMaterial( { map: starTexture } );
+            var star = new THREE.Mesh(starGeom, starMaterial);
+            star.position.set( pos.x, pos.y, pos.z );
+            scene.add(star);
+
+            var lightColor = new THREE.Color(0xff5d5d);
+            // add glow effect for the star
+            uniforms = { 
+                c:   { type: "f", value: 0.1 },
+                p:   { type: "f", value: 4.5 },
+                customColor: { type: "c", value: lightColor },
+                viewVector: { type: "v3", value: camera.position }
+            }
+            var glowMaterial = new THREE.ShaderMaterial( 
+            {
+                uniforms: uniforms,
+                vertexShader:   document.getElementById( 'vertexShader'   ).textContent,
+                fragmentShader: document.getElementById( 'fragmentShader' ).textContent,
+                side: THREE.FrontSide,
+                blending: THREE.AdditiveBlending,
+                transparent: true
+            }   );
+            this.starGlow = new THREE.Mesh( starGeom.clone(), glowMaterial.clone() );
+            starGlow.position.set( pos.x, pos.y, pos.z );
+            starGlow.scale.multiplyScalar(1.2);
+            scene.add( starGlow );
+
+            // TODO: add the emissive lights from the star
+            var light = new THREE.DirectionalLight( lightColor, 0.3 );
+            light.position.set( pos.x, pos.y, pos.z ).normalize();
+            light.castShadow = true;
+			light.shadow.mapSize.width = 512;
+			light.shadow.mapSize.height = 512;
+			light.shadow.camera.near = 0.5;
+            light.shadow.camera.far = 500;
+            scene.add( light );
+        }
+        
+        function addLight( h, s, l, x, y, z, textureFlareCore, textureFlareReflect) {
+            var light = new THREE.SpotLight( 0xf4e04b, 0.5, y + 50, Math.PI/3, 0.5, 0.7 );
+            light.color.setHSL( h, s, l );
+            light.position.set( x, y, z );
+            // add lensflare effect
+            var lensflare = new THREE.Lensflare();
+            lensflare.addElement( new THREE.LensflareElement( textureFlareCore,   160, 0.00, light.color, THREE.AdditiveBlending ) );
+            lensflare.addElement( new THREE.LensflareElement( textureFlareReflect, 30, 0.20, light.color, THREE.AdditiveBlending ) );
+            lensflare.addElement( new THREE.LensflareElement( textureFlareReflect, 35, 0.30, light.color, THREE.AdditiveBlending ) );
+            lensflare.addElement( new THREE.LensflareElement( textureFlareReflect, 60, 0.35, light.color, THREE.AdditiveBlending ) );
+            lensflare.addElement( new THREE.LensflareElement( textureFlareReflect, 35, 0.40, light.color, THREE.AdditiveBlending ) );
+            light.add( lensflare );
+            // add shadow effect
+            light.castShadow = true;
+			light.shadow.mapSize.width = ResolutionNear;
+			light.shadow.mapSize.height = ResolutionNear;
+			light.shadow.camera.near = 0.5;
+            light.shadow.camera.far = 100;
+            var targetObject = new THREE.Object3D();
+            targetObject.position.set( x, y-1, z );
+            light.target = targetObject
+            scene.add( targetObject );
+            scene.add( light );
+            scene.add( light.target );
+            // add street lamp
+            
+            var geometry = new THREE.CylinderGeometry( 0.1, 0.2, y );
+            // var textureLamp = textureLoader.load( "textures/streetLamp.jpg" );
+            var material = new THREE.MeshLambertMaterial( { color: 0x1a1b1c /*map: textureLamp*/ } );
+            var lamp = new THREE.Mesh( geometry, material );
+            lamp.position.set( x, y/2 - 0.5, z );
+            scene.add( lamp );
+            
+        }
+        
+        function addWalls() {
+            // wall in the center
+            addWall( 20, WallHeight, 20, 0, -25, 8, 1 );
+
+            // wall along x axis and in positive x
+            addWall( 45, WallHeight, WallWidth, 27.5,   0, 16, 1 );
+            addWall( 45, WallHeight, WallWidth, 27.5, -50, 16, 1 );
+            addWall( 26, WallHeight, WallWidth, 23.0, -25,  8, 1 );
+            // wall along z axis and in positive x
+            addWall( WallWidth, WallHeight, 48, 49.0,   -25, 16, 1 );
+            addWall( WallWidth, WallHeight, 11, 22.0,  -6.5,  4, 1 );
+            addWall( WallWidth, WallHeight, 11, 35.0, -18.5,  4, 1 );
+            addWall( WallWidth, WallHeight,  9, 15.0, -30.5,  4, 1 );
+            addWall( WallWidth, WallHeight,  9, 15.0, -44.5,  4, 1 );
+            addWall( WallWidth, WallHeight, 12, 25.0, -37.5,  4, 1 );
+            
+            // wall along x axis and in negative x
+            addWall( 45, WallHeight, WallWidth, -27.5,   0, 16, 1 );
+            addWall( 45, WallHeight, WallWidth, -27.5, -50, 16, 1 );
+            addWall( 26, WallHeight, WallWidth, -23.0, -25,  8, 1 );
+            // wall along z axis and in negative x
+            addWall( WallWidth, WallHeight, 48, -49.0, -25, 16, 1 );
+            
+        }
+        // given both x and z coordinates of the wall & width, length, height of the wall & material of wall
+        function addWall( w, l, h, x, z, r0, r1 ){
+            var textureBrick = textureLoader.load( "textures/brick2.png" );
+            var materialWall = new THREE.MeshPhongMaterial( { map: textureBrick } );
+			textureBrick.anisotropy = maxAnisotropy;
+			textureBrick.wrapS = textureBrick.wrapT = THREE.RepeatWrapping;
+            textureBrick.repeat.set( r0, r1 );
+            var wall = new THREE.Mesh( new THREE.BoxGeometry( w, l, h ), materialWall );
+            wall.position.set( x, WallHeight / 2, z );
+            wall.castShadow = true;
+            wall.receiveShadow = true;
+            scene.add( wall );
+            walls.push( wall );
+        }
+
+        function addMessage( message, x, y, z ) {
+            var loader = new THREE.FontLoader();
+            loader.load( 'fonts/helvetiker_regular.typeface.json', function ( font ) {
+                var xMid, text;
+                var color = 0xca2f2f;
+                var matDark = new THREE.LineBasicMaterial( {
+                    color: color,
+                    side: THREE.DoubleSide
+                } );
+                var matLite = new THREE.MeshBasicMaterial( {
+                    color: color,
+                    transparent: true,
+                    opacity: 0.4,
+                    side: THREE.DoubleSide
+                } );
+                // var message = "   Three.js\nSimple text.";
+                var shapes = font.generateShapes( message, 1 );
+                var geometry = new THREE.ShapeBufferGeometry( shapes );
+                geometry.computeBoundingBox();
+                xMid = - 0.5 * ( geometry.boundingBox.max.x - geometry.boundingBox.min.x );
+                geometry.translate( xMid, 0, 0 );
+                // make shape ( N.B. edge view not visible )
+                text = new THREE.Mesh( geometry, matLite );
+                text.position.set( x, y, z );
+                scene.add( text );
+                // make line shape ( N.B. edge view remains visible )
+                var holeShapes = [];
+                for ( var i = 0; i < shapes.length; i ++ ) {
+                    var shape = shapes[ i ];
+                    if ( shape.holes && shape.holes.length > 0 ) {
+                        for ( var j = 0; j < shape.holes.length; j ++ ) {
+                            var hole = shape.holes[ j ];
+                            holeShapes.push( hole );
+                        }
+                    }
+                }
+                shapes.push.apply( shapes, holeShapes );
+                var lineText = new THREE.Object3D();
+                for ( var i = 0; i < shapes.length; i ++ ) {
+                    var shape = shapes[ i ];
+                    var points = shape.getPoints();
+                    var geometry = new THREE.BufferGeometry().setFromPoints( points );
+                    geometry.translate( xMid, 0, z );
+                    var lineMesh = new THREE.Line( geometry, matDark );
+                    lineText.add( lineMesh );
+                }
+                scene.add( lineText );
+            } ); //end load function
+        }
+
+        function onKeyDown(){
+            /*
+            var key = event.keyCode
+            if ( key == 65 ){
+                // press A
+                // camera.rotation.y += RotationStep;
+                hero.rotation.y += RotationStep;
+            }
+            else if ( key == 68){
+                // press D
+                // camera.rotation.y -= RotationStep;
+                hero.rotation.y -= RotationStep;
+            }
+            else if ( key == 83){
+                // press S
+                
+                theta = -camera.rotation.y;
+                camera.position.z += PaceStep * Math.cos( theta );
+                camera.position.x -= PaceStep * Math.sin( theta );
+                
+                // hero.translateZ( PaceStep );
+                theta = -camera.rotation.y;
+                hero.position.z += PaceStep * Math.cos( theta );
+                hero.position.x -= PaceStep * Math.sin( theta );
+            }
+            else if ( key == 87){
+                // press W
+                
+                theta = -camera.rotation.y;
+                camera.position.z -= PaceStep * Math.cos( theta );
+                camera.position.x += PaceStep * Math.sin( theta );
+                
+                // hero.translateZ( -PaceStep );
+                theta = -camera.rotation.y;
+                hero.position.z -= PaceStep * Math.cos( theta );
+                hero.position.x += PaceStep * Math.sin( theta );
+            }
+            */
+            if ( key == 86){
+                // press V
+                isHeroVisible = !isHeroVisible;
+                hero.visible = isHeroVisible;
+            }
+            /*
+            // update camera postion and view vector
+            var relativeCameraOffset = RelativeCameraOffset.clone();
+            var cameraOffset = relativeCameraOffset.applyMatrix4( hero.matrixWorld );
+            camera.position.x = cameraOffset.x;
+            camera.position.y = cameraOffset.y;
+            camera.position.z = cameraOffset.z;
+            viewVec = new THREE.Vector3( hero.position.x, hero.position.y + 1, hero.position.z );
+            camera.lookAt( hero.position );
+            */
+        }
+
+        function updateKeyboard(){
+            // update hero position and rotation
+            eventID = 0;
+            if( keyboard.pressed("A") ){
+                hero.rotation.y += RotationStep;
+                eventID = 1;
+            }
+            else if( keyboard.pressed("D") ){
+                hero.rotation.y -= RotationStep;
+                eventID = 2;
+            }
+            if( keyboard.pressed("S") ){
+                hero.translateZ( PaceStep );
+                eventID = 3;
+            }
+            else if( keyboard.pressed("W") ){
+                hero.translateZ( -PaceStep );
+                eventID = 4;
+            }
+            if( keyboard.pressed("V") ){
+                visionHelpFlag++;
+                if(visionHelpFlag >= 1){
+                    visionHelpFlag = 0;
+                    isHeroVisible = !isHeroVisible;
+                    hero.visible = isHeroVisible;
+                }
+            }   
+            if ( detectCollision( hero, walls ) ) {
+                // redo previous step
+                if ( eventID == 3 ) {
+                    hero.translateZ( -WallWidth );
+                }
+                else if( eventID == 4 ) {
+                    hero.translateZ( WallWidth );
+                }
+            }
+            // update camera postion and view vector
+            var relativeCameraOffset = RelativeCameraOffset.clone();
+            var cameraOffset = relativeCameraOffset.applyMatrix4( hero.matrixWorld );
+            camera.position.x = cameraOffset.x;
+            camera.position.y = cameraOffset.y;
+            camera.position.z = cameraOffset.z;
+            viewVec = new THREE.Vector3( hero.position.x, hero.position.y + 1, hero.position.z );
+            camera.lookAt( hero.position );
+            //camera.lookAt( viewVec );
+            // call the keyboard to update
+            // keyboard.update();
+        }
+        /**
+         * return 0 if no collision
+         * return 1 if collision in the front
+         * return 2 if collision on the back
+         */
+        function detectCollision( obj, meshList ) {
+            hasCollision = false;
+            flag = 0;
+            for ( var vertIndex = 0; hasCollision == false && vertIndex < obj.geometry.vertices.length; vertIndex++ ){
+                var localVert = obj.geometry.vertices[ vertIndex ].clone();
+                var globalVert = localVert.applyMatrix4( obj.matrix );
+                var objCenter = obj.position.clone();
+                // get ray direction
+                var direction = globalVert.sub( objCenter );
+                var ray = new THREE.Raycaster( objCenter, direction.clone().normalize() );
+                var intersectedObjs = ray.intersectObjects( meshList );
+                if ( intersectedObjs.length > 0 && intersectedObjs[0].distance < direction.length() ) {
+                    hasCollision = true;
+                    if(localVert.z >= 0){
+                        flag = 1;
+                    }
+                    else{
+                        flag = 2;
+                    }
+                }
+            }
+            //log(flag);
+            //return hasCollision; 
+            return flag;
+        }
+
+        function update(){
+            // update keyboard event
+            updateKeyboard();
+            // update stats
+            stats.update();            
+        }
+
+        function render() {
+            // create blinking star effect
+            var time = Date.now() * 0.005;
+            plane.material.opacity = 0.9 + 0.1 * Math.sin( time * 0.5 ); 
+            //hero.material.opacity = 0.95 + 0.05 * Math.sin( time * 0.25); 
+            starGlow.material.uniforms.p.value = 3 + 1.5 * Math.sin( time * 0.5 );
+            // update halo effect for the moon
+            moonHalo.material.uniforms.viewVector.value = new THREE.Vector3().subVectors( camera.position, moonHalo.position );
+            starGlow.material.uniforms.viewVector.value = new THREE.Vector3().subVectors( camera.position, starGlow.position );
+            // render the scene and camera
+			renderer.render( scene, camera );
+        }
+        function animate() {
+            requestAnimationFrame( animate );
+            update();
+            render();
+        }
+        </script>        
+	</body>
+</html>
